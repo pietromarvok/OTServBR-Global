@@ -1,6 +1,4 @@
 /**
- * @file spawn.cpp
- * 
  * The Forgotten Server - a free and open-source MMORPG server emulator
  * Copyright (C) 2019 Mark Samman <mark.samman@gmail.com>
  *
@@ -38,20 +36,20 @@ extern Events* g_events;
 
 static constexpr int32_t MINSPAWN_INTERVAL = 1000;
 
-bool Spawns::loadFromXml(const std::string& fromFilename)
+bool Spawns::loadFromXml(const std::string& filename)
 {
 	if (loaded) {
 		return true;
 	}
 
 	pugi::xml_document doc;
-	pugi::xml_parse_result result = doc.load_file(fromFilename.c_str());
+	pugi::xml_parse_result result = doc.load_file(filename.c_str());
 	if (!result) {
-		printXMLError("Error - Spawns::loadFromXml", fromFilename, result);
+		printXMLError("Error - Spawns::loadFromXml", filename, result);
 		return false;
 	}
 
-	this->filename = fromFilename;
+	this->filename = filename;
 	loaded = true;
 
 	for (auto spawnNode : doc.child("spawns").children()) {
@@ -264,7 +262,7 @@ void Spawn::checkSpawn()
 			if (sb.mType->info.isBlockable) {
 				spawnMonster(spawnId, sb.mType, sb.pos, sb.direction);
 			} else {
-				scheduleSpawn(spawnId, sb, 3 * NONBLOCKABLE_SPAWN_INTERVAL);
+				scheduleSpawn(spawnId, sb, 1 * NONBLOCKABLE_SPAWN_INTERVAL);
 			}
 
 			if (++spawnCount >= static_cast<uint32_t>(g_config.getNumber(ConfigManager::RATE_SPAWN))) {
@@ -278,13 +276,13 @@ void Spawn::checkSpawn()
 	}
 }
 
-void Spawn::scheduleSpawn(uint32_t spawnId, spawnBlock_t& sb, uint16_t scheduleInterval)
+void Spawn::scheduleSpawn(uint32_t spawnId, spawnBlock_t& sb, uint16_t interval)
 {
 	if (interval <= 0) {
 		spawnMonster(spawnId, sb.mType, sb.pos, sb.direction);
 	} else {
 		g_game.addMagicEffect(sb.pos, CONST_ME_TELEPORT);
-		g_scheduler.addEvent(createSchedulerTask(1400, std::bind(&Spawn::scheduleSpawn, this, spawnId, sb, scheduleInterval - NONBLOCKABLE_SPAWN_INTERVAL)));
+		g_scheduler.addEvent(createSchedulerTask(1400, std::bind(&Spawn::scheduleSpawn, this, spawnId, sb, interval - NONBLOCKABLE_SPAWN_INTERVAL)));
 	}
 }
 
@@ -310,7 +308,7 @@ void Spawn::cleanup()
 	}
 }
 
-bool Spawn::addMonster(const std::string& name, const Position& pos, Direction dir, uint32_t scheduleInterval)
+bool Spawn::addMonster(const std::string& name, const Position& pos, Direction dir, uint32_t interval)
 {
 	MonsterType* mType = g_monsters.getMonsterType(name);
 	if (!mType) {
@@ -318,13 +316,13 @@ bool Spawn::addMonster(const std::string& name, const Position& pos, Direction d
 		return false;
 	}
 
-	this->interval = std::min(this->interval, scheduleInterval);
+	this->interval = std::min(this->interval, interval);
 
 	spawnBlock_t sb;
 	sb.mType = mType;
 	sb.pos = pos;
 	sb.direction = dir;
-	sb.interval = scheduleInterval;
+	sb.interval = interval;
 	sb.lastSpawn = 0;
 
 	uint32_t spawnId = spawnMap.size() + 1;
